@@ -1,5 +1,6 @@
 package com.example.navigation.navigation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -12,9 +13,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -24,29 +32,35 @@ import com.example.navigation.ui.screen.HomeDetailsScreen
 import com.example.navigation.ui.screen.HomeScreen
 import com.example.navigation.ui.screen.ProfileScreen
 
-@Preview
 @Composable
 fun NavigationApp() {
+    val bottomItems = listOf(Screen.Home, Screen.Favorites, Screen.Profile)
 
-    val navController = rememberNavController()
+    // NavController для каждой вкладки
+    val navControllers: Map<Screen, NavHostController> = bottomItems.associateWith { rememberNavController() }
 
-    val currentBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = currentBackStackEntry?.destination
-
-    val bottomItems = listOf(
-        Screen.Home,
-        Screen.Favorites,
-        Screen.Profile
+    // Saver для сохранения текущей вкладки при пересоздании Activity
+    val screenSaver = Saver<Screen, String>(
+        save = { it.route },
+        restore = { route ->
+            when (route) {
+                Screen.Home.route -> Screen.Home
+                Screen.HomeDetails.route -> Screen.HomeDetails
+                Screen.Favorites.route -> Screen.Favorites
+                Screen.Profile.route -> Screen.Profile
+                else -> Screen.Home
+            }
+        }
     )
+
+    var currentTab: Screen by rememberSaveable(stateSaver = screenSaver) {
+        mutableStateOf(Screen.Home)
+    }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
-
             bottomItems.forEach { screen ->
-
-                val selected = currentDestination
-                    ?.hierarchy
-                    ?.any { it.route?.startsWith(screen.route) == true } == true
+                val isSelected = currentTab == screen
 
                 item(
                     icon = {
@@ -61,29 +75,14 @@ fun NavigationApp() {
                         )
                     },
                     label = { Text(screen.route.substringBefore("/").replaceFirstChar { it.uppercase() }) },
-                    selected = selected,
+                    selected = isSelected,
                     onClick = {
-                        val currentDestination = navController.currentDestination
-
-                        val isOnSameTab = currentDestination
-                            ?.hierarchy
-                            ?.any { it.route?.startsWith(screen.route) == true } == true
-
-                        if (isOnSameTab) {
-                            // Если уже в этом табе — возвращаемся к корню
-                            navController.popBackStack(
-                                route = screen.route,
-                                inclusive = false
-                            )
+                        if (currentTab == screen) {
+                            // Сброс стека текущей вкладки до корня
+                            navControllers[screen]?.popBackStack(route = screen.route, inclusive = false)
                         } else {
-                            // Если другой таб — сохраняем состояние
-                            navController.navigate(screen.route) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+                            // Переключение на другую вкладку
+                            currentTab = screen
                         }
                     }
                 )
@@ -91,33 +90,47 @@ fun NavigationApp() {
         }
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-
-            NavHost(
-                navController = navController,
-                startDestination = Screen.Home.route,
-                modifier = Modifier.padding(innerPadding)
-            ) {
-
-                composable(Screen.Home.route) {
-                    HomeScreen(
-                        onGoToDetails = {
-                            navController.navigate(Screen.HomeDetails.route)
+            Box(modifier = Modifier.padding(innerPadding)) {
+                bottomItems.forEach { screen ->
+                    TabNavHost(
+                        navController = navControllers[screen]!!,
+                        startRoute = screen.route,
+                        visible = currentTab == screen
+                    ) {
+                        when (screen) {
+                            Screen.Home -> {
+                                composable(Screen.Home.route) {
+                                    HomeScreen(onGoToDetails = { navControllers[Screen.Home]?.navigate(Screen.HomeDetails.route) })
+                                }
+                                composable(Screen.HomeDetails.route) { HomeDetailsScreen() }
+                            }
+                            Screen.Favorites -> {
+                                composable(Screen.Favorites.route) { FavoritesScreen() }
+                            }
+                            Screen.Profile -> {
+                                composable(Screen.Profile.route) { ProfileScreen() }
+                            }
+                            else -> {} // для компилятора
                         }
-                    )
-                }
-
-                composable(Screen.HomeDetails.route) {
-                    HomeDetailsScreen()
-                }
-
-                composable(Screen.Favorites.route) {
-                    FavoritesScreen()
-                }
-
-                composable(Screen.Profile.route) {
-                    ProfileScreen()
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun TabNavHost(
+    navController: NavHostController,
+    startRoute: String,
+    visible: Boolean,
+    content: NavGraphBuilder.() -> Unit
+) {
+    if (visible) {
+        NavHost(
+            navController = navController,
+            startDestination = startRoute,
+            builder = content
+        )
     }
 }
