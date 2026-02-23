@@ -14,7 +14,7 @@ class SplashViewModel : ViewModel() {
 
     init {
         viewModelScope.launch {
-            delay(1500) // время сплэша
+            delay(1000) // время сплэша
             _isSplashVisible.value = false
         }
     }

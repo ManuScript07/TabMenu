@@ -17,10 +17,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun HomeScreen(onGoToDetails: () -> Unit) {
+fun HomeScreen(
+    onGoToDetails: () -> Unit,
+    onGoToSettings: () -> Unit
+) {
 
     Column(
-        modifier = Modifier.fillMaxSize().background(Color.Cyan),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Cyan),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -30,6 +35,12 @@ fun HomeScreen(onGoToDetails: () -> Unit) {
 
         Button(onClick = onGoToDetails) {
             Text("Go to Details")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = onGoToSettings) {
+            Text("Go to Settings")
         }
     }
 }
