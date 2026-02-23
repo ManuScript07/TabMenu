@@ -1,11 +1,15 @@
 package com.example.navigation.navigation
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Favorite
@@ -14,9 +18,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
@@ -24,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -42,9 +50,10 @@ import com.example.navigation.ui.screen.HomeSettingsScreen
 import com.example.navigation.ui.screen.ProfileScreen
 
 
+@SuppressLint("RestrictedApi")
 @Composable
 fun NavigationApp() {
-    val bottomItems = listOf(Screen.Home, Screen.Favorites, Screen.Profile)
+    val bottomItems = listOf(Screen.Favorites, Screen.Home, Screen.Profile) // Порядок
 
     // NavController для каждой вкладки
     val navControllers: Map<Screen, NavHostController> = bottomItems.associateWith { rememberNavController() }
@@ -67,7 +76,7 @@ fun NavigationApp() {
     )
 
     var currentTab: Screen by rememberSaveable(stateSaver = screenSaver) {
-        mutableStateOf(Screen.Home)
+        mutableStateOf(Screen.Home) // Основной таб
     }
 
     val context = LocalContext.current
@@ -76,12 +85,12 @@ fun NavigationApp() {
     BackHandler {
         val currentNavController = navControllers[currentTab]!!
 
-        val backStackRoutes = currentNavController.currentBackStack.value
-            .mapNotNull { it.destination.route }
-            .joinToString(" -> ")
-
-        Log.d("NAV_DEBUG", "Текущий таб: ${currentTab.route}")
-        Log.d("NAV_DEBUG", "Стек этого таба: $backStackRoutes")
+//        val backStackRoutes = currentNavController.currentBackStack.value
+//            .mapNotNull { it.destination.route }
+//            .joinToString(" -> ")
+//
+//        Log.d("NAV_DEBUG", "Текущий таб: ${currentTab.route}")
+//        Log.d("NAV_DEBUG", "Стек этого таба: $backStackRoutes")
 
         // 1. Пытаемся вернуться назад ВНУТРИ текущего таба
         // (например, из HomeDetails в Home)
@@ -90,7 +99,7 @@ fun NavigationApp() {
         }
         // 2. Если внутри таба мы в корне, но сам таб — не Home
         else if (currentTab != Screen.Home) {
-            currentTab = Screen.Home
+            currentTab = Screen.Home // Основной таб
             // Здесь МЫ НЕ ВЫЗЫВАЕМ popBackStack() для Home,
             // чтобы сохранить там открытый дочерний экран (HomeDetails), если он был.
         }
@@ -100,6 +109,8 @@ fun NavigationApp() {
         }
     }
     NavigationSuiteScaffold(
+        layoutType = NavigationSuiteType.NavigationBar,
+        containerColor = Color.Transparent,
         navigationSuiteItems = {
             bottomItems.forEach { screen ->
                 val isSelected = currentTab == screen
@@ -129,10 +140,17 @@ fun NavigationApp() {
                     }
                 )
             }
-        }
+        },
     ) {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding)) {
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets(0, 0, 0, 0)),
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        ) { innerPadding ->
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .consumeWindowInsets(innerPadding)) {
                 bottomItems.forEach { screen ->
                     TabNavHost(
                         navController = navControllers[screen]!!,
@@ -144,9 +162,13 @@ fun NavigationApp() {
                                 composable(Screen.Home.route) {
                                     HomeScreen(
                                         onGoToDetails = { navControllers[Screen.Home]?.navigate(
-                                            Screen.HomeDetails.route) },
+                                            Screen.HomeDetails.route) {
+                                            launchSingleTop= true
+                                        }},
                                         onGoToSettings = {navControllers[Screen.Home]?.navigate(
-                                            Screen.HomeSettings.route)}
+                                            Screen.HomeSettings.route){
+                                            launchSingleTop = true
+                                        }}
                                     )
 
                                 }
@@ -154,7 +176,9 @@ fun NavigationApp() {
                                     HomeDetailsScreen(
                                         onGoToDeepDetails = {navControllers[Screen.Home]?.navigate(
                                             Screen.HomeDeepDetails.route
-                                        )}
+                                        ){
+                                            launchSingleTop = true
+                                        }}
                                     )
                                 }
 
@@ -170,7 +194,9 @@ fun NavigationApp() {
                                     FavoritesScreen(
                                         onGoToFavDetails = {navControllers[Screen.Favorites]?.navigate(
                                             Screen.FavDetails.route
-                                        )}
+                                        ){
+                                            launchSingleTop = true
+                                        }}
                                     )
                                 }
                                 composable(Screen.FavDetails.route){
@@ -199,6 +225,12 @@ fun TabNavHost(
     // Если таб не активен, мы полностью убираем NavHost из дерева композиции.
     // Это гарантирует, что системный BackHandler внутри NavHost не будет мешать.
     if (visible) {
+//        DisposableEffect(startRoute) {
+//            Log.d("NAV_DEBUG", "Таб $startRoute стал видимым")
+//            onDispose {
+//                Log.d("NAV_DEBUG", "Таб $startRoute скрыт")
+//            }
+//        }
         NavHost(
             navController = navController,
             startDestination = startRoute,
@@ -207,3 +239,4 @@ fun TabNavHost(
         )
     }
 }
+
