@@ -13,7 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 @Preview
 @Composable
 fun FavoritesScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(Color.Red), contentAlignment = Alignment.Center) {
         Text("Favorites Screen")
     }
 }

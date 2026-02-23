@@ -1,5 +1,7 @@
 package com.example.navigation.navigation
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,6 +21,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraphBuilder
@@ -55,6 +58,26 @@ fun NavigationApp() {
 
     var currentTab: Screen by rememberSaveable(stateSaver = screenSaver) {
         mutableStateOf(Screen.Home)
+    }
+
+    val homeTab = Screen.Home
+    val context = LocalContext.current
+
+    // 🔹 Обработка системной кнопки Back
+    BackHandler {
+        val navController = navControllers[currentTab]!!
+
+        // Если можно подняться по стеку текущей вкладки → делаем pop
+        if (!navController.popBackStack()) {
+            // На корне текущей вкладки
+            if (currentTab != homeTab) {
+                // Переходим на Home, но сохраняем его стек
+                currentTab = homeTab
+            } else {
+                // Уже на корне Home → обычный выход
+                (context as? Activity)?.finish()
+            }
+        }
     }
 
     NavigationSuiteScaffold(
@@ -110,7 +133,7 @@ fun NavigationApp() {
                             Screen.Profile -> {
                                 composable(Screen.Profile.route) { ProfileScreen() }
                             }
-                            else -> {} // для компилятора
+                            else -> {}
                         }
                     }
                 }
